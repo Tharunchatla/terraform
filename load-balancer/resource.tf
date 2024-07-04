@@ -23,16 +23,16 @@ resource "aws_route_table" "rt" {
     vpc_id = aws_vpc.vpc.id
     route  {
         cidr_block = "0.0.0.0/0"
-        gateway_id = "aws_internet_gateway.igw.id"
+        gateway_id = aws_internet_gateway.igw.id
     }
 }
 resource "aws_route_table_association" "a" {
-    subnet_id = aws_subnet.subnet_1
-    route_table_id = aws_route_table.rt
+    subnet_id = aws_subnet.subnet_1.id
+    route_table_id = aws_route_table.rt.id
 }
 resource "aws_route_table_association" "b" {
-    subnet_id = aws_subnet.subnet_2
-    route_table_id = aws_route_table.rt
+    subnet_id = aws_subnet.subnet_2.id
+    route_table_id = aws_route_table.rt.id
 }
 resource "aws_instance" "server-1" {
     ami = var.ami_id
@@ -82,21 +82,40 @@ resource "aws_security_group" "sg1" {
     }
 }
 resource "aws_lb" "lb" {
-  name               = "lb"
+  name               = "my-load-balancer"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.sg1.id]
   subnets            = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id]
+}
 
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.lb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.target_group.arn
+  }
 }
 
 resource "aws_lb_target_group" "target_group" {
-  name     = "example-tg"
+  name     = "my-target-group"
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.vpc.id
-}
 
+  health_check {
+    path                = "/"
+    port                = 80
+    protocol            = "HTTP"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 3
+    interval            = 30
+  }
+}
 resource "aws_lb_target_group_attachment" "server-1" {
   target_group_arn = aws_lb_target_group.target_group.arn
   target_id        = aws_instance.server-1.id
@@ -108,3 +127,6 @@ resource "aws_lb_target_group_attachment" "server-2" {
   target_id        = aws_instance.server-2.id
   port             = 80
 }
+
+
+   
